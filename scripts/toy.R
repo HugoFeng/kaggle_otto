@@ -1,6 +1,5 @@
 # Load data set
 inputData <- read.csv('../data/train.csv')
-#head(inputData)
 Num.totalSize <- dim(inputData)[1]
 Num.totalCol <- dim(inputData)[2]
 library(nnet)
@@ -32,17 +31,20 @@ Y.tr <- Y.tr[index]
 Y.tri <- Y.tri[index]
 
 using.tree <- function(trainX, trainY){
+    print(paste("Using Decision tree."))
     trainXY.combined <- cbind(trainX, trainY)
     model <- tree(trainY~., trainXY.combined)
 }
 
 using.nnet <- function(trainX, trainY){
-    hiddenLayer_size <- 8
-    iterations <- 200
+    hiddenLayer_size <- 10
+    iterations <- 50
+    print("Using Neural Network.")
     print(paste("Hidden Layer size: ", hiddenLayer_size))
     print(paste("Max iterations: ", iterations))
+    
     trainY_matrix = class.ind(trainY)
-    model <- nnet(trainX, trainY_matrix, , size = hiddenLayer_size,  mmaxit = iterations, rang = 0.1, decay = 5e-4, MaxNWts=1000000, linout = FALSE, trace=FALSE)
+    model <- nnet(x=trainX, y=trainY_matrix, size = hiddenLayer_size,  mmaxit = iterations, rang = 0.1, decay = 5e-4, MaxNWts=1000000, linout = FALSE, trace=FALSE)
 }
 
 BERate_list = NULL
@@ -50,8 +52,6 @@ mis_error_list = NULL
 logloss_list = NULL
 # for(hiddenLayer_size in 1:15)
 # {
-# Building a Neural Network
-
 
 model <- using.nnet(X.tr, Y.tr)
 result <- predict(model, X.ts)
@@ -60,11 +60,6 @@ result.label <- max.col(result)
 # #Buiding SVM # TODO: still have problems
 # model<-svm(Y.tri,X.tr)
 # result.label <- predict(model, X.ts)
-
-# # Building Tree
-# model <- using.tree(X.tr, Y.tr)
-# result<-predict(model, X.ts)
-# result.label <- max.col(result)
 
 # # Building KNN model with 'lazy' package # has problem
 # model <- lazy(Y.tr~., trainXY.combined)
@@ -76,7 +71,7 @@ result.label <- max.col(result)
 #print(paste("Classification accuracy: ", accuracy))
 
 # mis-classification error
-mis_error <- mean(Y.tsi!=result.label)
+mis_error <- mean(as.numeric(Y.tsi!=result.label))
 mis_error_list <- c(mis_error_list, mis_error)
 print(paste("Mis-Classification error rate: ", mis_error))
 
