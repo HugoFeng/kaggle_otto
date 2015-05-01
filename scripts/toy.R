@@ -5,19 +5,19 @@ library('randomForest')
 set.seed(0)
 
 using.tree <- function(trainX, trainY){
-    print("Using Decision tree.")
+    print("Training Decision tree.")
     trainXY.combined <- cbind(trainX, trainY)
     model <- tree(trainY~., data=trainXY.combined)
 }
 
 using.randomForest <- function(trainX, trainY){
-    print("Using Random Forest.")
+    print("Training Forest.")
     trainXY.combined <- cbind(trainX, trainY)
     model <- randomForest(trainY~., data=trainXY.combined)
 }
 
 using.svm <- function(trainX, trainY){
-    print("Using svm.")
+    print("Training svm.")
     trainXY.combined <- cbind(trainX, trainY)
     model <- svm(trainY~., data=trainXY.combined)
 }
@@ -25,7 +25,7 @@ using.svm <- function(trainX, trainY){
 using.nnet <- function(trainX, trainY){
     hiddenLayer_size <- 10
     iterations <- 50
-    print("Using Neural Network.")
+    print("Training Neural Network.")
     print(paste("Hidden Layer size: ", hiddenLayer_size))
     print(paste("Max iterations: ", iterations))
     
@@ -39,16 +39,12 @@ using.bagging <- function(train, trainX, trainY, testX) {
     train.num <- dim(trainX)[1]
     train.sub.num <- floor(train.num/(model.num-2))
     test.num <- dim(testX)[1]
-    model.list <- list()
+    result <- data.frame(matrix(0, nrow=test.num, ncol=9))
     for(model.index in 1:model.num){
         train.sub.indices <- sample(1:train.num, train.sub.num)
         train.sub.x <- trainX[train.sub.indices, ]
         train.sub.y <- trainY[train.sub.indices]
         model <- train(train.sub.x, train.sub.y)
-        model.list <- c(model.list, model)
-    }
-    result <- data.frame(0, matrix(nrow=test.num, ncol=9))
-    for(model in model.list){
         result.tmp = predict(model, testX)
         if(is.factor(result.tmp)){
             result.label <- as.numeric(sub('Class_', '', result.tmp))
