@@ -3,48 +3,54 @@ library(e1071)
 library('tree')
 library('randomForest')
 set.seed(0)
+par(mfrow=c(1,1))
 
-using.tree <- function(trainX, trainY){
+using.tree <- function(trainX, trainY, ...){
     print("Training Decision tree.")
     trainXY.combined <- cbind(trainX, trainY)
-    model <- tree(trainY~., data=trainXY.combined)
+    model <- tree(trainY~., data=trainXY.combined, ...)
 }
 
-using.randomForest <- function(trainX, trainY){
+using.randomForest <- function(trainX, trainY, ...){
     print("Training Forest.")
     trainXY.combined <- cbind(trainX, trainY)
-    model <- randomForest(trainY~., data=trainXY.combined)
+    model <- randomForest(trainY~., data=trainXY.combined, ...)
 }
 
-using.svm <- function(trainX, trainY){
+using.svm <- function(trainX, trainY, ...){
     print("Training svm.")
     trainXY.combined <- cbind(trainX, trainY)
-    model <- svm(trainY~., data=trainXY.combined)
+    model <- svm(trainY~., data=trainXY.combined, ...)
 }
 
-using.nnet <- function(trainX, trainY){
+using.nnet <- function(trainX, trainY, ...){
     hiddenLayer_size <- 10
     iterations <- 50
     print("Training Neural Network.")
-    print(paste("Hidden Layer size: ", hiddenLayer_size))
-    print(paste("Max iterations: ", iterations))
+    print(paste("Hidden Layer size:", hiddenLayer_size))
+    print(paste("Max iterations:", iterations))
     
     trainY_matrix = class.ind(trainY)
-    model <- nnet(x=trainX, y=trainY_matrix, size = hiddenLayer_size,  mmaxit = iterations, rang = 0.1, decay = 5e-4, MaxNWts=1000000, linout = FALSE, trace=FALSE)
+    model <- nnet(x=trainX, y=trainY_matrix, size = hiddenLayer_size, mmaxit = iterations, 
+                  rang = 0.1, decay = 5e-4, MaxNWts=1000000, linout = FALSE, trace=FALSE, ...)
 }
 
-using.bagging <- function(train, trainX, trainY, testX) {
-    model.num <- 5
-    print(paste("Using Bagging with ", model.num, " models."))
+using.bagging <- function(train, trainX, trainY, testX, model.num=5, ...) {
+    print(paste("Using Bagging with", model.num, "models."))
     train.num <- dim(trainX)[1]
-    train.sub.num <- floor(train.num/(model.num-2))
+    if(model.num>1)
+        # If number of models is greater than 1, 
+        # always take 1/3 more than the average part of training samples.
+        train.sub.num <- floor(4./3 * train.num/model.num)
+    else
+        train.sub.num <- floor(train.num/model.num)
     test.num <- dim(testX)[1]
     result <- data.frame(matrix(0, nrow=test.num, ncol=9))
     for(model.index in 1:model.num){
         train.sub.indices <- sample(1:train.num, train.sub.num)
         train.sub.x <- trainX[train.sub.indices, ]
         train.sub.y <- trainY[train.sub.indices]
-        model <- train(train.sub.x, train.sub.y)
+        model <- train(train.sub.x, train.sub.y, ...)
         result.tmp = predict(model, testX)
         if(is.factor(result.tmp)){
             result.label <- as.numeric(sub('Class_', '', result.tmp))
@@ -66,16 +72,23 @@ pca.projecter <- function(pca, original, feature_size){
     subtract <- data.frame(subtract)
 }
 
+# Prepare plot
+plot(seq(1, 100), rep(0, 100), ylim = c(0, 1.0), axes=FALSE, main="Bagging with Neural Network", 
+     type="n", ylab = "Misclassification Rate", xlab = "Feature Size")
+axis(side=1, at=seq(0, 100, by=10))
+axis(side=2, at=seq(0, 1, by=0.1))
+box()
+
 # Load data set
 inputData <- read.csv('../data/train.csv')
 Num.totalSize <- dim(inputData)[1]
 Num.totalCol <- dim(inputData)[2]
 
-# Shuffle the original data
+# Shuffle the row order of the original data
 shuffleIndeces <- sample(1:Num.totalSize)
 inputData <- inputData[shuffleIndeces, ]
 
-Num.folds <- 3
+Num.folds <- 3 # K-fold cross-validation
 Num.labels <- length(levels(inputData[, Num.totalCol]))
 Num.test.size <- floor(Num.totalSize/Num.folds)
 fold.size <- floor(Num.totalSize/Num.folds)
@@ -85,16 +98,16 @@ all.x <- inputData[, 2:(Num.totalCol-1)]
 all.y <- inputData[, Num.totalCol]
 
 features.pca <- prcomp(all.x, center = TRUE, scale. = TRUE)
-for (features.size in seq(10, 40, 10)){
-    print("####################")
-    print(paste("## PCA feature size ", features.size))
+for (features.size in seq(10, 90, 10)){
+    print("##############################")
+    print(paste("##    PCA feature size", features.size))
     # Gather stats for all the folds
-    BERate_list = NULL
-    mis_error_list = NULL
-    logloss_list = NULL
+    BERate.list = NULL
+    mis_error.list = NULL
+    logloss.list = NULL
     for (fold.index in 1:Num.folds) {
-        print("------------------")
-        print(paste("Working on fold #", fold.index))
+        print(paste("---------- Fold #", fold.index, "----------"))
+
         # Create a training and a test set for this fold
         fold.test.indices <- (1+(fold.index-1)*fold.size) : (fold.index * fold.size)
         fold.train.indices <- setdiff(1:Num.totalSize, fold.test.indices)
@@ -114,48 +127,50 @@ for (features.size in seq(10, 40, 10)){
         fold.test.x <- pca.projecter(features.pca, fold.test.x, features.size)
 
         ###### model training and prediction
-        ## train can be given as: using.nnet, using.tree, using.randomForest
-#         train <- using.svm
-#         model <- train(fold.train.x, fold.train.y)
-#         result <- predict(model, fold.test.x)      
-        result <- using.bagging(using.tree, fold.train.x, fold.train.y, fold.test.x) 
+        ## train can be given as: using.nnet, using.tree, using.randomForest, using.bagging
+        train <- using.bagging
+        if(all.equal(train, using.bagging)){
+            # when calling using.bagging, need to pass the trainer to it as the first argument
+            result <- using.bagging(using.nnet, fold.train.x, fold.train.y, fold.test.x, model.num=5) 
+        }else{
+            model <- train(fold.train.x, fold.train.y)
+            result <- predict(model, fold.test.x)  
+        }
+    
         if(is.factor(result)){
             result.label <- as.numeric(sub('Class_', '', result))
         }else{
             result.label <- max.col(result)
         }
 
-        
-
-
-        
-
         ###### mis-classification error
         mis_error <- mean(as.numeric(fold.test.yi!=result.label))
-        mis_error_list <- c(mis_error_list, mis_error)
-        print(paste("   Mis-Classification error rate: ", mis_error))
+        mis_error.list <- c(mis_error.list, mis_error)
+        print(paste("   Mis-Classification error rate:", mis_error))
 
         ###### Balanced error rate
         ## The index of column means the predicted results,
         ## while the index of row means the real class label.
-        BER_matrix <- matrix(0, nrow=Num.labels, ncol=Num.labels)
+        BER.matrix <- matrix(0, nrow=Num.labels, ncol=Num.labels)
         ## For each sample and predicted results
         for(sampleIndex in 1:Num.test.size) {
             realLabel <- fold.test.yi[sampleIndex]
             predictedLabel <- result.label[sampleIndex]
-            BER_matrix[predictedLabel, realLabel] = BER_matrix[predictedLabel, realLabel] + 1
+            BER.matrix[predictedLabel, realLabel] = BER.matrix[predictedLabel, realLabel] + 1
         }
         BERate <- 0
         for(label in 1:Num.labels) {
-            Tnum <- BER_matrix[label, label]
-            TFnum <- sum(BER_matrix[,label])
+            Tnum <- BER.matrix[label, label]
+            TFnum <- sum(BER.matrix[,label])
             BERate <- BERate + Tnum/TFnum
         }
         BERate <- BERate/Num.labels
-        BERate_list <- c(BERate_list, BERate)
-        print(paste("   balanced error rate: ", BERate))
+        BERate.list <- c(BERate.list, BERate)
+        print(paste("   Balanced error rate:", BERate))
 
         ###### logloss
+        ## For some classifiers, the predicted results only contains predicted labels, 
+        ## without the scores of each label. So logloss is impossible to compute in this case.
         if(!is.factor(result)){
             logloss <- 0
             for(sampleIndex in Num.test.size) {
@@ -170,23 +185,29 @@ for (features.size in seq(10, 40, 10)){
                 logloss <- logloss + log_p_ij
             }
             logloss <- -logloss/Num.test.size
-            logloss_list <- c(logloss_list, logloss)
-            print(paste("   logloss: ", logloss))
+            logloss.list <- c(logloss.list, logloss)
+            print(paste("   Logloss:", logloss))
         }
     }
-    mis_error_allfolds <- mean(mis_error_list)
-    BERate_allfolds <- mean(BERate_list)
-    logloss_allfolds <- mean(logloss_list)
-    print("=======^^^===all folds done===^^^======")
-    print(paste("Mis-Classification error rate: ", mis_error_allfolds))
-    print(paste("balanced error rate: ", BERate_allfolds))
-    print(paste("logloss: ", logloss_allfolds))
-    print("=======================================")
+    mis_error.allfolds <- mean(mis_error.list)
+    BERate.allfolds <- mean(BERate.list)
+    logloss.allfolds <- mean(logloss.list)
+    print("===== all folds done, summary below =====")
+    print(paste("Mis-Classification error rate: ", mis_error.allfolds))
+    print(paste("Balanced error rate: ", BERate.allfolds))
+    if(!is.na(logloss.allfolds)) 
+        print(paste("Logloss: ", logloss.allfolds))
+    print(paste("##    PCA feature size", features.size))
+    print("##############################")
+    points(features.size, mis_error.allfolds, pch = 16, cex = 0.6)
+    text(features.size, mis_error.allfolds+0.1, round(mis_error.allfolds, 3), cex=0.8)
+    sdev <- sd(mis_error.list)
+    arrows(features.size, mis_error.allfolds-sdev, features.size, mis_error.allfolds+sdev, length=0.05, angle=90, code=3)
 }
 
 # x <- 1:15
 # par(mfrow=c(1,1))
 # #plot(c(1, 15), c(0, 1), type="n")
-# plot(x, BERate_list, xlim=c(1, 15), ylim=c(0, 1), type="l", col="red")
-# lines(x, mis_error_list, col="blue")
-# lines(x, logloss_list, col="black")
+# plot(x, BERate.list, xlim=c(1, 15), ylim=c(0, 1), type="l", col="red")
+# lines(x, mis_error.list, col="blue")
+# lines(x, logloss.list, col="black")
