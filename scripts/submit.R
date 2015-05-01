@@ -51,10 +51,9 @@ if(is.factor(result)){
     for(i in 1:9){
         nameList<-c(nameList, paste("Class_",sep="", i))
     }
-    result <- data.frame(matrix(nrow=Num.test.totalSize, ncol=9))
+    result <- data.frame(matrix(0, nrow=Num.test.totalSize, ncol=9))
     colnames(result)<-nameList
     for(row in 1:Num.test.totalSize){
-        result[row, ] <- rep(0, 9)
         result[row, maxindices[row]] <- 1
     }
 }

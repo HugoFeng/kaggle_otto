@@ -33,6 +33,37 @@ using.nnet <- function(trainX, trainY){
     model <- nnet(x=trainX, y=trainY_matrix, size = hiddenLayer_size,  mmaxit = iterations, rang = 0.1, decay = 5e-4, MaxNWts=1000000, linout = FALSE, trace=FALSE)
 }
 
+using.bagging <- function(train, trainX, trainY, testX) {
+    model.num <- 5
+    print(paste("Using Bagging with ", model.num, " models."))
+    train.num <- dim(trainX)[1]
+    train.sub.num <- floor(train.num/(model.num-2))
+    test.num <- dim(testX)[1]
+    model.list <- list()
+    for(model.index in 1:model.num){
+        train.sub.indices <- sample(1:train.num, train.sub.num)
+        train.sub.x <- trainX[train.sub.indices, ]
+        train.sub.y <- trainY[train.sub.indices]
+        model <- train(train.sub.x, train.sub.y)
+        model.list <- c(model.list, model)
+    }
+    result <- data.frame(0, matrix(nrow=test.num, ncol=9))
+    for(model in model.list){
+        result.tmp = predict(model, testX)
+        if(is.factor(result.tmp)){
+            result.label <- as.numeric(sub('Class_', '', result.tmp))
+        }else{
+            result.label <- max.col(result.tmp)
+        }
+        # for each test sample, accumulate the predicted label vote in the result data frame
+        for(test.index in 1:test.num){
+            label <- result.label[test.index]
+            result[test.index, label] <- result[test.index, label] + 1
+        }
+    }
+    result
+}
+
 pca.projecter <- function(pca, original, feature_size){
     projected <- predict(pca, original)
     subtract <- projected[,1:feature_size]
@@ -50,15 +81,14 @@ inputData <- inputData[shuffleIndeces, ]
 
 Num.folds <- 3
 Num.labels <- length(levels(inputData[, Num.totalCol]))
-Num.ts.size <- floor(Num.totalSize/Num.folds)
+Num.test.size <- floor(Num.totalSize/Num.folds)
 fold.size <- floor(Num.totalSize/Num.folds)
-Num.tr.size <- Num.totalSize-Num.ts.size
+Num.train.size <- Num.totalSize-Num.test.size
 
 all.x <- inputData[, 2:(Num.totalCol-1)]
 all.y <- inputData[, Num.totalCol]
-# project all features to log space, and 0s are avoided
-all.x.projected <- log(all.x+10^-3)
-features.pca <- prcomp(all.x.projected, center = TRUE, scale. = TRUE)
+
+features.pca <- prcomp(all.x, center = TRUE, scale. = TRUE)
 for (features.size in seq(10, 40, 10)){
     print("####################")
     print(paste("## PCA feature size ", features.size))
@@ -89,14 +119,18 @@ for (features.size in seq(10, 40, 10)){
 
         ###### model training and prediction
         ## train can be given as: using.nnet, using.tree, using.randomForest
-        train <- using.svm
-        model <- train(fold.train.x, fold.train.y)
-        result <- predict(model, fold.test.x)
+#         train <- using.svm
+#         model <- train(fold.train.x, fold.train.y)
+#         result <- predict(model, fold.test.x)      
+        result <- using.bagging(using.tree, fold.train.x, fold.train.y, fold.test.x) 
         if(is.factor(result)){
             result.label <- as.numeric(sub('Class_', '', result))
         }else{
             result.label <- max.col(result)
         }
+
+        
+
 
         
 
@@ -110,7 +144,7 @@ for (features.size in seq(10, 40, 10)){
         ## while the index of row means the real class label.
         BER_matrix <- matrix(0, nrow=Num.labels, ncol=Num.labels)
         ## For each sample and predicted results
-        for(sampleIndex in 1:Num.ts.size) {
+        for(sampleIndex in 1:Num.test.size) {
             realLabel <- fold.test.yi[sampleIndex]
             predictedLabel <- result.label[sampleIndex]
             BER_matrix[predictedLabel, realLabel] = BER_matrix[predictedLabel, realLabel] + 1
@@ -128,7 +162,7 @@ for (features.size in seq(10, 40, 10)){
         ###### logloss
         if(!is.factor(result)){
             logloss <- 0
-            for(sampleIndex in Num.ts.size) {
+            for(sampleIndex in Num.test.size) {
                 outputs <- result[sampleIndex, ]
                 # Probability of being classified as one of the labels
                 p_i <- outputs/sum(outputs)
@@ -139,7 +173,7 @@ for (features.size in seq(10, 40, 10)){
                 log_p_ij <- log(p_ij)
                 logloss <- logloss + log_p_ij
             }
-            logloss <- -logloss/Num.ts.size
+            logloss <- -logloss/Num.test.size
             logloss_list <- c(logloss_list, logloss)
             print(paste("   logloss: ", logloss))
         }
