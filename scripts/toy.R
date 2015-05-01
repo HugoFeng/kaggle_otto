@@ -131,8 +131,8 @@ axis(side=1, at=seq(0, 100, by=10))
 axis(side=2, at=seq(0, 1, by=0.1))
 
 box()
-legend(x=80,y=1,c("Misclass Rate","Balanced Error Rate", "Logloss"),cex=.6, 
-        col=c("red","blue","yellow"),pch=c(0,1,2))
+legend(x=75,y=1,c("Misclass Rate","Balanced Error Rate", "Logloss"),cex=.7, 
+        col=c("red","blue","magenta"),pch=c(0,1,2))
 
 # Load data set
 inputData <- read.csv('../data/train.csv')
@@ -223,25 +223,26 @@ for (features.size in seq(10, 90, 10)){
     print(paste("Logloss: ", logloss.allfolds))
     print(paste("##    PCA feature size", features.size))
     print("##############################")
+
     # Plot mis-error rate
-    points(features.size, mis_error.allfolds, pch = 0, cex = 0.6, col='red')
-    text(features.size+1, mis_error.allfolds, round(mis_error.allfolds, 3), cex=0.8, col='red')
+    points(features.size, mis_error.allfolds, pch = 0, cex = 0.5, col='red')
+    text(features.size, mis_error.allfolds+0.05, round(mis_error.allfolds, 3), cex=0.8, col='red')
     sdev <- sd(mis_error.list)
     arrows(features.size, mis_error.allfolds-sdev, features.size, mis_error.allfolds+sdev, 
            col='red', length=0.05, angle=90, code=3)
 
     # Plot Balanced Error rate
-    points(features.size, BERate.allfolds, pch = 1, cex = 0.6, col='blue')
-    text(features.size+1, BERate.allfolds+0.1, round(BERate.allfolds, 3), cex=0.8, col='blue')
+    points(features.size, BERate.allfolds, pch = 1, cex = 0.5, col='blue')
+    text(features.size, BERate.allfolds+0.05, round(BERate.allfolds, 3), cex=0.8, col='blue')
     sdev <- sd(mis_error.list)
     arrows(features.size, BERate.allfolds-sdev, features.size, BERate.allfolds+sdev,
         col='blue', length=0.05, angle=90, code=3)
 
     # Plot Logloss rate
-    points(features.size, logloss.allfolds, pch = 2, cex = 0.6, col='yellow')
-    text(features.size+1, logloss.allfolds+0.1, round(logloss.allfolds, 3), cex=0.8, col='yellow')
+    points(features.size, logloss.allfolds/15, pch = 2, cex = 0.5, col='magenta')
+    text(features.size, logloss.allfolds/15+0.05, round(logloss.allfolds, 3), cex=0.8, col='magenta')
     sdev <- sd(mis_error.list)
-    arrows(features.size, logloss.allfolds-sdev, features.size, logloss.allfolds+sdev, 
-           col='yellow', length=0.05, angle=90, code=3)
+    arrows(features.size, (logloss.allfolds-sdev)/15, features.size, (logloss.allfolds+sdev)/15, 
+           col='magenta', length=0.05, angle=90, code=3)
 
 }
