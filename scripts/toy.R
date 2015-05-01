@@ -27,8 +27,8 @@ using.nnet <- function(trainX, trainY, ...){
     hiddenLayer_size <- 10
     iterations <- 50
     print("Training Neural Network.")
-    print(paste("Hidden Layer size:", hiddenLayer_size))
-    print(paste("Max iterations:", iterations))
+    print(paste("   Hidden Layer size:", hiddenLayer_size))
+    print(paste("   Max iterations:", iterations))
     
     trainY_matrix = class.ind(trainY)
     model <- nnet(x=trainX, y=trainY_matrix, size = hiddenLayer_size, mmaxit = iterations, 
@@ -72,8 +72,57 @@ pca.projecter <- function(pca, original, feature_size){
     subtract <- data.frame(subtract)
 }
 
+# Computing logloss for a predicted result
+compute.logloss <- function(result.df, target.label, test.size, label.size=9){
+    logloss <- 0
+    # For some classifiers, the predicted results only contains predicted labels, 
+    # so we need to construct a matrix just like class.ind() did.
+    if(is.factor(result.df)){
+        result.matrix <- matrix(0, nrow=label.size, ncol=label.size)
+        result.label <- as.numeric(sub('Class_', '', result.df))
+        for(sample.index in 1:test.size){
+            predictedLabel <- result.label[sample.index]
+            result.matrix[sample.index, predictedLabel] <- 1
+        }
+        result.df <- result.matrix
+    } 
+    for(sample.index in 1:test.size) {
+        outputs <- result.df[sample.index, ]
+        # Probability of being classified as one of the labels
+        p.i <- outputs/sum(outputs)
+        
+        targetLabel <- target.label[sample.index]
+        # avoid 0 probability
+        p.ij <- max(min(p.i[targetLabel], 1-10^-15), 10^-15)
+        log_p.ij <- log(p.ij)
+        logloss <- logloss + log_p.ij
+    }
+    logloss <- -logloss/test.size
+}
+
+# Computing Balanced Error rate
+compute.BERate <- function(result.label, target.label, test.size, label.size){
+    ###### Balanced error rate
+    ## The index of column means the predicted results,
+    ## while the index of row means the real class label.
+    BER.matrix <- matrix(0, nrow=label.size, ncol=label.size)
+    ## For each sample and predicted results
+    for(sample.index in 1:test.size) {
+        realLabel <- target.label[sample.index]
+        predictedLabel <- result.label[sample.index]
+        BER.matrix[predictedLabel, realLabel] = BER.matrix[predictedLabel, realLabel] + 1
+    }
+    BERate <- 0
+    for(label in 1:label.size) {
+        Tnum <- BER.matrix[label, label]
+        TFnum <- sum(BER.matrix[,label])
+        BERate <- BERate + Tnum/TFnum
+    }
+    BERate <- BERate/label.size
+}
+
 # Prepare plot
-plot(seq(1, 100), rep(0, 100), ylim = c(0, 1.0), axes=FALSE, main="Bagging with Neural Network", 
+plot(seq(1, 100), rep(0, 100), ylim = c(0, 1.0), axes=FALSE, main="Bagging with Decision tree", 
      type="n", ylab = "Misclassification Rate", xlab = "Feature Size")
 axis(side=1, at=seq(0, 100, by=10))
 axis(side=2, at=seq(0, 1, by=0.1))
@@ -131,7 +180,7 @@ for (features.size in seq(10, 90, 10)){
         train <- using.bagging
         if(all.equal(train, using.bagging)){
             # when calling using.bagging, need to pass the trainer to it as the first argument
-            result <- using.bagging(using.nnet, fold.train.x, fold.train.y, fold.test.x, model.num=5) 
+            result <- using.bagging(using.tree, fold.train.x, fold.train.y, fold.test.x, model.num=5) 
         }else{
             model <- train(fold.train.x, fold.train.y)
             result <- predict(model, fold.test.x)  
@@ -149,45 +198,15 @@ for (features.size in seq(10, 90, 10)){
         print(paste("   Mis-Classification error rate:", mis_error))
 
         ###### Balanced error rate
-        ## The index of column means the predicted results,
-        ## while the index of row means the real class label.
-        BER.matrix <- matrix(0, nrow=Num.labels, ncol=Num.labels)
-        ## For each sample and predicted results
-        for(sampleIndex in 1:Num.test.size) {
-            realLabel <- fold.test.yi[sampleIndex]
-            predictedLabel <- result.label[sampleIndex]
-            BER.matrix[predictedLabel, realLabel] = BER.matrix[predictedLabel, realLabel] + 1
-        }
-        BERate <- 0
-        for(label in 1:Num.labels) {
-            Tnum <- BER.matrix[label, label]
-            TFnum <- sum(BER.matrix[,label])
-            BERate <- BERate + Tnum/TFnum
-        }
-        BERate <- BERate/Num.labels
+        BERate <- compute.BERate(result.label, fold.test.yi, fold.test.size, Num.labels)
         BERate.list <- c(BERate.list, BERate)
         print(paste("   Balanced error rate:", BERate))
 
         ###### logloss
-        ## For some classifiers, the predicted results only contains predicted labels, 
-        ## without the scores of each label. So logloss is impossible to compute in this case.
-        if(!is.factor(result)){
-            logloss <- 0
-            for(sampleIndex in Num.test.size) {
-                outputs <- result[sampleIndex, ]
-                # Probability of being classified as one of the labels
-                p_i <- outputs/sum(outputs)
-                
-                predictedLabel <- result.label[sampleIndex]
-                # avoid 0 probability
-                p_ij <- max(min(p_i[predictedLabel], 1-10^-15), 10^-15)
-                log_p_ij <- log(p_ij)
-                logloss <- logloss + log_p_ij
-            }
-            logloss <- -logloss/Num.test.size
-            logloss.list <- c(logloss.list, logloss)
-            print(paste("   Logloss:", logloss))
-        }
+        logloss <- compute.logloss(result, fold.test.yi, fold.test.size)
+        logloss.list <- c(logloss.list, logloss)
+        print(paste("   Logloss:", logloss))
+        
     }
     mis_error.allfolds <- mean(mis_error.list)
     BERate.allfolds <- mean(BERate.list)
@@ -195,8 +214,7 @@ for (features.size in seq(10, 90, 10)){
     print("===== all folds done, summary below =====")
     print(paste("Mis-Classification error rate: ", mis_error.allfolds))
     print(paste("Balanced error rate: ", BERate.allfolds))
-    if(!is.na(logloss.allfolds)) 
-        print(paste("Logloss: ", logloss.allfolds))
+    print(paste("Logloss: ", logloss.allfolds))
     print(paste("##    PCA feature size", features.size))
     print("##############################")
     points(features.size, mis_error.allfolds, pch = 16, cex = 0.6)
@@ -204,10 +222,3 @@ for (features.size in seq(10, 90, 10)){
     sdev <- sd(mis_error.list)
     arrows(features.size, mis_error.allfolds-sdev, features.size, mis_error.allfolds+sdev, length=0.05, angle=90, code=3)
 }
-
-# x <- 1:15
-# par(mfrow=c(1,1))
-# #plot(c(1, 15), c(0, 1), type="n")
-# plot(x, BERate.list, xlim=c(1, 15), ylim=c(0, 1), type="l", col="red")
-# lines(x, mis_error.list, col="blue")
-# lines(x, logloss.list, col="black")
