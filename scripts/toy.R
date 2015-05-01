@@ -3,7 +3,7 @@ library(e1071)
 library('tree')
 library('randomForest')
 set.seed(0)
-par(mfrow=c(1,1))
+par(mar = c(5,5,2,5))
 
 using.tree <- function(trainX, trainY, ...){
     print("Training Decision tree.")
@@ -116,17 +116,23 @@ compute.BERate <- function(result.label, target.label, test.size, label.size){
     for(label in 1:label.size) {
         Tnum <- BER.matrix[label, label]
         TFnum <- sum(BER.matrix[,label])
-        BERate <- BERate + Tnum/TFnum
+        BERate <- BERate + (1-Tnum/TFnum)
     }
     BERate <- BERate/label.size
 }
 
 # Prepare plot
+plot(seq(1, 100), rep(0, 100), ylim = c(0, 15.0), axes=FALSE, type="n", xlab = NA, ylab = NA)
+axis(side=4, at=seq(0, 15, by=3))
+par(new = T)
 plot(seq(1, 100), rep(0, 100), ylim = c(0, 1.0), axes=FALSE, main="Bagging with Decision tree", 
-     type="n", ylab = "Misclassification Rate", xlab = "Feature Size")
+     type="n", ylab = "", xlab = "Feature Size")
 axis(side=1, at=seq(0, 100, by=10))
 axis(side=2, at=seq(0, 1, by=0.1))
+
 box()
+legend(x=80,y=1,c("Misclass Rate","Balanced Error Rate", "Logloss"),cex=.6, 
+        col=c("red","blue","yellow"),pch=c(0,1,2))
 
 # Load data set
 inputData <- read.csv('../data/train.csv')
@@ -217,8 +223,25 @@ for (features.size in seq(10, 90, 10)){
     print(paste("Logloss: ", logloss.allfolds))
     print(paste("##    PCA feature size", features.size))
     print("##############################")
-    points(features.size, mis_error.allfolds, pch = 16, cex = 0.6)
-    text(features.size, mis_error.allfolds+0.1, round(mis_error.allfolds, 3), cex=0.8)
+    # Plot mis-error rate
+    points(features.size, mis_error.allfolds, pch = 0, cex = 0.6, col='red')
+    text(features.size+1, mis_error.allfolds, round(mis_error.allfolds, 3), cex=0.8, col='red')
     sdev <- sd(mis_error.list)
-    arrows(features.size, mis_error.allfolds-sdev, features.size, mis_error.allfolds+sdev, length=0.05, angle=90, code=3)
+    arrows(features.size, mis_error.allfolds-sdev, features.size, mis_error.allfolds+sdev, 
+           col='red', length=0.05, angle=90, code=3)
+
+    # Plot Balanced Error rate
+    points(features.size, BERate.allfolds, pch = 1, cex = 0.6, col='blue')
+    text(features.size+1, BERate.allfolds+0.1, round(BERate.allfolds, 3), cex=0.8, col='blue')
+    sdev <- sd(mis_error.list)
+    arrows(features.size, BERate.allfolds-sdev, features.size, BERate.allfolds+sdev,
+        col='blue', length=0.05, angle=90, code=3)
+
+    # Plot Logloss rate
+    points(features.size, logloss.allfolds, pch = 2, cex = 0.6, col='yellow')
+    text(features.size+1, logloss.allfolds+0.1, round(logloss.allfolds, 3), cex=0.8, col='yellow')
+    sdev <- sd(mis_error.list)
+    arrows(features.size, logloss.allfolds-sdev, features.size, logloss.allfolds+sdev, 
+           col='yellow', length=0.05, angle=90, code=3)
+
 }
