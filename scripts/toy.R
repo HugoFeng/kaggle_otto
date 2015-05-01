@@ -153,7 +153,7 @@ all.x <- inputData[, 2:(Num.totalCol-1)]
 all.y <- inputData[, Num.totalCol]
 
 features.pca <- prcomp(all.x, center = TRUE, scale. = TRUE)
-for (features.size in seq(10, 90, 10)){
+for (features.size in seq(5, 90, 5)){
     print("##############################")
     print(paste("##    PCA feature size", features.size))
     # Gather stats for all the folds
@@ -183,7 +183,7 @@ for (features.size in seq(10, 90, 10)){
 
         ###### model training and prediction
         ## train can be given as: using.nnet, using.tree, using.randomForest, using.bagging
-        train <- using.bagging
+        train <- using.tree
         if(all.equal(train, using.bagging)){
             # when calling using.bagging, need to pass the trainer to it as the first argument
             result <- using.bagging(using.tree, fold.train.x, fold.train.y, fold.test.x, model.num=5) 
