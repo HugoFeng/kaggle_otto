@@ -184,7 +184,7 @@ for (features.size in seq(5, 90, 5)){
         ###### model training and prediction
         ## train can be given as: using.nnet, using.tree, using.randomForest, using.bagging
         train <- using.tree
-        if(all.equal(train, using.bagging)){
+        if(all.equal(train, using.bagging)==TRUE){
             # when calling using.bagging, need to pass the trainer to it as the first argument
             result <- using.bagging(using.tree, fold.train.x, fold.train.y, fold.test.x, model.num=5) 
         }else{
