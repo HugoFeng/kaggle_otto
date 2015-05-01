@@ -78,7 +78,7 @@ compute.logloss <- function(result.df, target.label, test.size, label.size=9){
     # For some classifiers, the predicted results only contains predicted labels, 
     # so we need to construct a matrix just like class.ind() did.
     if(is.factor(result.df)){
-        result.matrix <- matrix(0, nrow=label.size, ncol=label.size)
+        result.matrix <- matrix(0, nrow=test.size, ncol=label.size)
         result.label <- as.numeric(sub('Class_', '', result.df))
         for(sample.index in 1:test.size){
             predictedLabel <- result.label[sample.index]
@@ -122,11 +122,11 @@ compute.BERate <- function(result.label, target.label, test.size, label.size){
 }
 
 # Prepare plot
-plot(seq(1, 100), rep(0, 100), ylim = c(0, Num.rightAxisMax), axes=FALSE, type="n", xlab = NA, ylab = NA)
 Num.rightAxisMax <- 20
+plot(seq(1, 100), rep(0, 100), ylim = c(0, Num.rightAxisMax), axes=FALSE, type="n", xlab = NA, ylab = NA)
 axis(side=4, at=seq(0, Num.rightAxisMax, by=2))
 par(new = T)
-plot(seq(1, 100), rep(0, 100), ylim = c(0, 1.0), axes=FALSE, main="Bagging with Decision tree", 
+plot(seq(1, 100), rep(0, 100), ylim = c(0, 1.0), axes=FALSE, main="Random Forest", 
      type="n", ylab = "", xlab = "Feature Size")
 axis(side=1, at=seq(0, 100, by=10))
 axis(side=2, at=seq(0, 1, by=0.1))
@@ -154,7 +154,7 @@ all.x <- inputData[, 2:(Num.totalCol-1)]
 all.y <- inputData[, Num.totalCol]
 
 features.pca <- prcomp(all.x, center = TRUE, scale. = TRUE)
-for (features.size in seq(5, 90, 5)){
+for (features.size in seq(5, 90, 10)){
     print("##############################")
     print(paste("##    PCA feature size", features.size))
     # Gather stats for all the folds
@@ -184,7 +184,7 @@ for (features.size in seq(5, 90, 5)){
 
         ###### model training and prediction
         ## train can be given as: using.nnet, using.tree, using.randomForest, using.bagging
-        train <- using.nnet
+        train <- using.randomForest
         if(all.equal(train, using.bagging)==TRUE){
             # when calling using.bagging, need to pass the trainer to it as the first argument
             result <- using.bagging(using.tree, fold.train.x, fold.train.y, fold.test.x, model.num=5) 
@@ -199,7 +199,7 @@ for (features.size in seq(5, 90, 5)){
             result.label <- max.col(result)
         }
 
-        ###### mis-classification error
+        ###### mis-classification Error
         mis_error <- mean(as.numeric(fold.test.yi!=result.label))
         mis_error.list <- c(mis_error.list, mis_error)
         print(paste("   Mis-Classification error rate:", mis_error))
@@ -211,6 +211,9 @@ for (features.size in seq(5, 90, 5)){
 
         ###### logloss
         logloss <- compute.logloss(result, fold.test.yi, fold.test.size)
+        # Sometimes the predicted output could be all zeros, so computing logloss would 
+        # result in devided-by-zero problem, which leads to logloss equals NaN.
+        # If this happens, this contagious element is ignored.
         if(!is.na(logloss))
           logloss.list <- c(logloss.list, logloss)  
         print(paste("   Logloss:", logloss))
