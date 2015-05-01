@@ -122,8 +122,9 @@ compute.BERate <- function(result.label, target.label, test.size, label.size){
 }
 
 # Prepare plot
-plot(seq(1, 100), rep(0, 100), ylim = c(0, 15.0), axes=FALSE, type="n", xlab = NA, ylab = NA)
-axis(side=4, at=seq(0, 15, by=3))
+plot(seq(1, 100), rep(0, 100), ylim = c(0, Num.rightAxisMax), axes=FALSE, type="n", xlab = NA, ylab = NA)
+Num.rightAxisMax <- 20
+axis(side=4, at=seq(0, Num.rightAxisMax, by=2))
 par(new = T)
 plot(seq(1, 100), rep(0, 100), ylim = c(0, 1.0), axes=FALSE, main="Bagging with Decision tree", 
      type="n", ylab = "", xlab = "Feature Size")
@@ -183,7 +184,7 @@ for (features.size in seq(5, 90, 5)){
 
         ###### model training and prediction
         ## train can be given as: using.nnet, using.tree, using.randomForest, using.bagging
-        train <- using.tree
+        train <- using.nnet
         if(all.equal(train, using.bagging)==TRUE){
             # when calling using.bagging, need to pass the trainer to it as the first argument
             result <- using.bagging(using.tree, fold.train.x, fold.train.y, fold.test.x, model.num=5) 
@@ -210,7 +211,8 @@ for (features.size in seq(5, 90, 5)){
 
         ###### logloss
         logloss <- compute.logloss(result, fold.test.yi, fold.test.size)
-        logloss.list <- c(logloss.list, logloss)
+        if(!is.na(logloss))
+          logloss.list <- c(logloss.list, logloss)  
         print(paste("   Logloss:", logloss))
         
     }
@@ -239,10 +241,10 @@ for (features.size in seq(5, 90, 5)){
         col='blue', length=0.05, angle=90, code=3)
 
     # Plot Logloss rate
-    points(features.size, logloss.allfolds/15, pch = 2, cex = 0.5, col='magenta')
-    text(features.size, logloss.allfolds/15+0.05, round(logloss.allfolds, 3), cex=0.8, col='magenta')
+    points(features.size, logloss.allfolds/Num.rightAxisMax, pch = 2, cex = 0.5, col='magenta')
+    text(features.size, logloss.allfolds/Num.rightAxisMax+0.05, round(logloss.allfolds, 3), cex=0.8, col='magenta')
     sdev <- sd(mis_error.list)
-    arrows(features.size, (logloss.allfolds-sdev)/15, features.size, (logloss.allfolds+sdev)/15, 
+    arrows(features.size, (logloss.allfolds-sdev)/Num.rightAxisMax, features.size, (logloss.allfolds+sdev)/Num.rightAxisMax, 
            col='magenta', length=0.05, angle=90, code=3)
 
 }
